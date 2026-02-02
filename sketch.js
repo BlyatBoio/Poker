@@ -1,9 +1,25 @@
+let players = [];
+let board;
+let deck;
+let playerCount = 4;
+let playerStartingCash = 10000;
+let entryBet = 10;
+
 function setup() {
   createCanvas(windowWidth, windowHeight);
+  for(let i = 0; i < playerCount; i++){
+    new player();
+  }
 }
 
 function draw() {
   background(50);
+}
+
+function setupGame(){
+  deck = new Deck();
+  board = new Board();
+  players = [];
 }
 
 class ranks{
@@ -29,6 +45,129 @@ class suits{
   static SPADES="Spades";
 }
 
+class visualHandler{
+}
+
+class action{
+  constructor(type, value){
+    this.type = type;
+    this.value = value;
+  }
+}
+
+class Round{
+  constructor(){
+    this.curPlayer = 0;
+    this.totalBet = 0;
+    this.hasRaised = false;
+    this.curPlayers = players;
+  }
+
+  startRound(){
+    for(p of players){
+      p.curBet = entryBet;
+      this.totalBet += entryBet;
+    }
+  }
+
+  runTurn(){
+    if(this.curPlayer > players.length){
+      this.endTurn();
+    }
+
+    action = players[this.curPlayer].askAction();
+    if(action == false) return;
+    else{
+      if(action.type == "pass"){
+
+        if(this.hasRaised) this.players.splice(this.curPlayer, this.curPlayer+1);
+        else this.curPlayer ++;
+        return;
+      }
+      else if(action.type == "raise"){
+        players[this.curPlayer].curBet += action.value;
+        this.totalBet += action.value;
+        this.hasRaised = true;
+      }
+      else if(action.type == "match"){
+        players[this.curPlayer].curBet += action.value;
+        this.totalBet += action.value;
+      }
+      else if(action.type == "fold"){
+        this.players.splice(this.curPlayer, this.curPlayer+1);
+      }
+    }
+  }
+
+  endTurn(){
+    this.curPlayer = 0;
+    this.hasRaised = false;
+  }
+
+  endRound(){
+    bestHand = 0;
+    winner = undefined;
+    for(p of players){
+      p.curCash -= p.curBet;
+      hand = new totalHand(
+        p.hand.cards[0], p.hand.cards[1], 
+        board.flop[0], board.flop[1], board.flop[2],
+        board.turn, board.river);
+      if(handValueHelper.getHandValue(hand) > bestHand){
+        winner = p;
+      }
+    }
+
+    winner.curCash += this.totalBet
+    this.hasRaised = false;
+    this.totalBet = 0;
+    this.curPlayer = 0;
+  }
+}
+
+class Board{
+  constructor(){
+    this.flop = []
+    for(let i = 0; i < 3; i++){
+      this.flop.push(deck.drawCard());
+    } 
+    this.turn = deck.drawCard();
+    this.river = deck.drawCard();
+  }
+}
+
+class player{
+  constructor(){
+    this.playerID = players.length;
+    players.push(this);
+    this.hand = new playerHand();
+    this.getHand();
+    this.curCash = playerStartingCash;
+    this.selectedAction = false;
+    this.curBet = 0;
+  }
+  getHand(){
+    this.hand = new playerHand();
+    this.hand.fillRandom();
+  }
+  getScore(){
+    return handValueHelper.getHandValue(
+      new totalHand()
+    )
+  }
+  selectAction(value){
+    this.selectAction = value;
+  }
+  askAction(){
+    valueToReturn = false;
+    if(this.selectAction != false) {
+      valueToReturn = this.selectAction;
+      this.selectAction = false
+    }
+    return false;
+  }
+}
+
 class baseHandValues{
   static HIGH_CARD=1;
   static PAIR=10;
@@ -42,7 +181,7 @@ class baseHandValues{
   static ROYAL_FLUSH=1000000000;
 }
 
-class deck{
+class Deck{
   constructor(){
     this.cards = [];
     this.cardsOut = [];
@@ -87,15 +226,6 @@ class deck{
 }
 
 class handValueHelper{
-  static getHighCard(hand){
-    highValue = 0;
-    for(let card of hand.cards){
-      if(card.rank > highValue){
-        highValue = card.rank;
-      }
-    }
-    return highValue;
-  }
   static getNumberOfRanks(hand, rank){
     count = 0;
     for(let card of hand.cards){
@@ -104,6 +234,15 @@ class handValueHelper{
       }
     }
     return count;
+  }
+  static getHighCard(hand){
+    highValue = 0;
+    for(let card of hand.cards){
+      if(card.rank > highValue){
+        highValue = card.rank;
+      }
+    }
+    return highValue;
   }
   static getPair(hand){
     for(let rank = 14; rank >= 2; rank--){
@@ -150,45 +289,86 @@ class handValueHelper{
     }
     return [];
   }
-  static getStraight(hand){
+  static getStraightFlush(hand){
     score = 0;
-    if(this.isStraight(hand)){
-      for(card in hand.cards){
-        score += card.rank;
+    firstSuit = hand.cards[0].suit;
+    for(let i = 0; i < sortedRanks.length - 1; i++){
+      if(hand.cards[i].suit != firstSuit || sortedRanks[i] + 1 != sortedRanks[i + 1]){
+        return 0;
       }
     }
     return score;
+  }
+  static getRoyalFlush(hand){
+    score = 0;
+    firstSuit = hand.cards[0].suit;
+    for(card in hand.cards){
+      if(card.rank < 10 || card.suit != firstSuit) return 0;
+      score += card.rank;
+    }
+    return score;
+    
   }
   static getFlush(hand){
     score = 0;
-    if(this.isFlush(hand)){
-      for(card in hand.cards){
-        score += card.rank;
-      }
-    }
-    return score;
-  }
-  static isFlush(hand){
+    // wont work cause it checks first value even though there could be a flush after index 0
     firstSuit = hand.cards[0].suit;
     for(let card of hand.cards){
       if(card.suit != firstSuit){
         return false;
       }
+      score += card.rank;
     }
     return true;
   }
-  static isStraight(hand){
+  static getStraight(hand){
+    score = 0;
     sortedRanks = hand.ranks.slice().sort((a, b) => a - b);
     for(let i = 0; i < sortedRanks.length - 1; i++){
       if(sortedRanks[i] + 1 != sortedRanks[i + 1]){
-        return false;
+        return 0;
       }
+      score += card.rank;
+      if(i > 5) return score
     }
-    return true;
+  }
+  static getHandValue(hand){
+    highCard = HIGH_CARD*handValueHelper.getHighCard(hand);
+    pair = PAIR*handValueHelper.getPair(hand);
+    twoPair = TWO_PAIR*handValueHelper.getTwoPair(hand);
+    threeOfAKind = THREE_OF_A_KIND*handValueHelper.getThreeOfAKind(hand);
+    fourOfAKind = FOUR_OF_A_KIND*handValueHelper.getFourOfAKind(hand);
+    fullHouse = FULL_HOUSE*handValueHelper.getFullHouse(hand);
+    straight = STRAIGHT*handValueHelper.getStraight(hand);
+    straightFlush = STRAIGHT_FLUSH*handValueHelper.getStraightFlush(hand);
+    scores = [highCard, pair, twoPair, threeOfAKind, fourOfAKind, fullHouse, straight, straightFlush];
+    scores = scores.sort((a,b) => a-b);
+    return scores[0];
   }
 }
 
-class hand{
+class playerHand{
+  constructor(cards){
+    this.cards = cards;
+    this.ranks = [];
+    this.suits = [];
+    for(let card of cards){
+      this.ranks.push(card.rank);
+      this.suits.push(card.suit);
+    }
+  }
+
+  fillRandom(){
+    for(let i = 0; i < 2; i++){
+      card = deck.drawCard();
+      this.cards.push(card);
+      this.ranks.push(card.rank);
+      this.suits.push(card.suit);
+    }
+  }
+}
+
+class totalHand{
   constructor(cards){
     this.cards = cards;
     this.ranks = [];
