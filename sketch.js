@@ -45,9 +45,6 @@ class suits{
   static SPADES="Spades";
 }
 
-class visualHandler{
-}
-
 class action{
   constructor(type, value){
     this.type = type;
@@ -55,12 +52,36 @@ class action{
   }
 }
 
-class Round{
+class Game{
   constructor(){
+    this.players = players
+    this.round = new Round(this.players);
+  }
+  
+  newRound(){
+    this.round = new Round(this.players);
+    this.round.startRound();
+  }
+  
+  run(){
+    this.round.runTurn();
+    if(this.round.curTurn >= 3){
+      this.newRound();
+    }
+  }
+}
+
+class Round{
+  constructor(startPlayers){
     this.curPlayer = 0;
     this.totalBet = 0;
     this.hasRaised = false;
-    this.curPlayers = players;
+    this.curTurn = 1;
+    this.startPlayers = startPlayers
+    this.curPlayers = startPlayers;
+    this.turnPlayers = this.curPlayers;
+    this.havePlayed = [];
+    this.raisedBet = 0;
   }
 
   startRound(){
@@ -71,51 +92,83 @@ class Round{
   }
 
   runTurn(){
-    if(this.curPlayer > players.length){
-      this.endTurn();
-    }
+    // end turn when all players have played
+    if(this.curPlayer >= this.turnPlayers.length) this.endTurn();
 
-    action = players[this.curPlayer].askAction();
+    // get the action performed by the player
+    action = this.turnPlayers[this.curPlayer].askAction();
+
+    // return if no action was performed
     if(action == false) return;
     else{
+      this.havePlayed.push(players[this.curPlayer]); // the current player has now played
+      // do nothing
       if(action.type == "pass"){
-
-        if(this.hasRaised) this.players.splice(this.curPlayer, this.curPlayer+1);
+        // equivalent to folding
+        if(this.hasRaised) {
+          this.curPlayers.splice(this.curPlayers.indexOf(this.turnPlayers[this.curPlayer]), 1);
+          this.havePlayed.splice(this.havePlayed.indexOf(this.turnPlayers[this.curPlayer]), 1);
+          this.turnPlayers.splice(this.turnPlayers.indexOf(this.turnPlayers[this.curPlayer]), 1);
+        }
         else this.curPlayer ++;
         return;
       }
+      // raise the bet
       else if(action.type == "raise"){
-        players[this.curPlayer].curBet += action.value;
+        // raise current bet
+        this.turnPlayers[this.curPlayer].curBet += action.value;
         this.totalBet += action.value;
+        this.raisedBet = action.value;
+
+        // re-add all who have played because they must raise or match to stay in
+        for(p of this.havePlayed){
+          this.turnPlayers.push(p);
+        }
+        // reset who has played because everyone needs to play again
+        this.havePlayed = [this.turnPlayers[this.curPlayer]];
+        this.curPlayer ++;
         this.hasRaised = true;
       }
+      // match the raised bet
       else if(action.type == "match"){
-        players[this.curPlayer].curBet += action.value;
-        this.totalBet += action.value;
+        this.turnPlayers[this.curPlayer].curBet += this.raisedBet;
+        this.totalBet += this.raisedBet;
+        this.curPlayer ++;
       }
+      // remove the player from all relevant arrays
       else if(action.type == "fold"){
-        this.players.splice(this.curPlayer, this.curPlayer+1);
+        if(this.hasRaised) {
+          this.curPlayers.splice(this.curPlayers.indexOf(this.turnPlayers[this.curPlayer]), 1);
+          this.havePlayed.splice(this.havePlayed.indexOf(this.turnPlayers[this.curPlayer]), 1);
+          this.turnPlayers.splice(this.turnPlayers.indexOf(this.turnPlayers[this.curPlayer]), 1);
+        }  
       }
     }
   }
 
   endTurn(){
+    this.curTurn ++;
     this.curPlayer = 0;
     this.hasRaised = false;
+    this.turnPlayers = this.curPlayers;
+    this.havePlayed = [];
+    this.raisedBet = 0;
+    if(this.curTurn == 3){
+      this.endRound();
+    }
   }
 
   endRound(){
     bestHand = 0;
     winner = undefined;
-    for(p of players){
+    for(p of this.startPlayers){
       p.curCash -= p.curBet;
-      hand = new totalHand(
+      let hand = new totalHand(
         p.hand.cards[0], p.hand.cards[1], 
         board.flop[0], board.flop[1], board.flop[2],
         board.turn, board.river);
-      if(handValueHelper.getHandValue(hand) > bestHand){
-        winner = p;
-      }
+
+      if(handValueHelper.getHandValue(hand) > bestHand) winner = p;
     }
 
     winner.curCash += this.totalBet
@@ -187,7 +240,6 @@ class Deck{
     this.cardsOut = [];
     this.createDeck()
   }
-
   createDeck(){
     for(let i = 0; i < 4; i++){
       let suit;
@@ -210,13 +262,11 @@ class Deck{
       }
     }
   }
-
   resetDeck(){
     this.cards = [];
     this.cardsOut = [];
     this.createDeck();
   }
-
   drawCard(){
     cardDrawn = random(this.cards);
     this.cardsOut.push(cardDrawn);
