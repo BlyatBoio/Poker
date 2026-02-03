@@ -4,33 +4,25 @@ let deck;
 let playerCount = 4;
 let playerStartingCash = 10000;
 let entryBet = 10;
+let socket;
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
+
   setupGame();
   for(let i = 0; i < playerCount; i++){
     let p = new player();
   }
 }
 
+async function getValue(){
+  const response = await fetch('https://api/doSomething');
+  const data = await response.json();
+  return Response.json({ data });
+}
+
 function draw() {
   background(50);
-  fetch('/api/doSomething', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ message: 'User clicked mouse', x: mouseX, y: mouseY }),
-  })
-  .then(response => response.json())
-  .then(data => {
-    console.log('Server response:', data);
-    // Update p5.js sketch based on server data
-    // e.g., textSize(data.newSize);
-  })
-  .catch((error) => {
-    console.error('Error:', error);
-  });
 }
 
 function setupGame(){
