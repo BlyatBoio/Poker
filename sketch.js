@@ -4,14 +4,13 @@ let deck;
 let playerCount = 4;
 let playerStartingCash = 10000;
 let entryBet = 10;
-const socket = io();
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
+  setupGame();
   for(let i = 0; i < playerCount; i++){
-    new player();
+    let p = new player();
   }
-  socket.on("message", () => console.log("Recieved Client Message"));
 }
 
 function draw() {
@@ -196,14 +195,14 @@ class player{
   constructor(){
     this.playerID = players.length;
     players.push(this);
-    this.hand = new playerHand();
+    this.hand = new playerHand([]);
     this.getHand();
     this.curCash = playerStartingCash;
     this.selectedAction = false;
     this.curBet = 0;
   }
   getHand(){
-    this.hand = new playerHand();
+    this.hand = new playerHand([]);
     this.hand.fillRandom();
   }
   getScore(){
@@ -271,7 +270,7 @@ class Deck{
     this.createDeck();
   }
   drawCard(){
-    cardDrawn = random(this.cards);
+    let cardDrawn = random(this.cards);
     this.cardsOut.push(cardDrawn);
     this.cards.splice(this.cards.indexOf(cardDrawn), 1);
     return cardDrawn;
@@ -405,7 +404,7 @@ class playerHand{
     this.cards = cards;
     this.ranks = [];
     this.suits = [];
-    for(let card of cards){
+    for(let card of this.cards){
       this.ranks.push(card.rank);
       this.suits.push(card.suit);
     }
