@@ -4,6 +4,7 @@ let deck;
 let playerCount = 4;
 let playerStartingCash = 10000;
 let entryBet = 10;
+const socket = io();
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
