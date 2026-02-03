@@ -11,10 +11,12 @@ function setup() {
   for(let i = 0; i < playerCount; i++){
     new player();
   }
+  socket.on("message", () => console.log("Recieved Client Message"));
 }
 
 function draw() {
   background(50);
+  
 }
 
 function setupGame(){
